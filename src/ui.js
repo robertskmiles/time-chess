@@ -547,9 +547,27 @@ function toggleStereo() {
 }
 el('stereo').addEventListener('click', toggleStereo);
 
+// --- the how-to-play guide (shown automatically on the first visit) ------
+const guideEl = el('guide');
+function showGuide(show) {
+  guideEl.hidden = !show;
+  if (!show) {
+    try { localStorage.setItem('timechess-guide-seen', '1'); } catch { /* private mode */ }
+  }
+}
+el('guidebtn').addEventListener('click', () => showGuide(true));
+el('guide-close').addEventListener('click', () => showGuide(false));
+el('guide-start').addEventListener('click', () => showGuide(false));
+guideEl.addEventListener('click', (ev) => { if (ev.target === guideEl) showGuide(false); });
+try {
+  if (!localStorage.getItem('timechess-guide-seen')) showGuide(true);
+} catch { /* no storage: just don't auto-open */ }
+
 window.addEventListener('keydown', (ev) => {
   if (ev.target.tagName === 'INPUT') return;
   const k = ev.key.toLowerCase();
+  if (k === 'escape' && !guideEl.hidden) { showGuide(false); return; }
+  if (k === 'h') { showGuide(guideEl.hidden); return; }
   if (k === 'n') setMode('now');
   else if (k === 'r') setMode('recent');
   else if (k === 'a') setMode('all');

@@ -77,6 +77,37 @@
   #queue { font-size: 12.5px; color: var(--dim); }
   #queue span { color: var(--ink); }
 
+  /* The how-to-play guide overlay */
+  #guide {
+    position: fixed; inset: 0; z-index: 20; display: flex;
+    align-items: center; justify-content: center; padding: 18px;
+    background: rgba(4, 6, 10, 0.6); backdrop-filter: blur(3px);
+  }
+  #guide[hidden] { display: none; }
+  #guide-card {
+    background: #12161f; border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 12px; max-width: 600px; width: 100%;
+    max-height: 88vh; max-height: 88dvh; overflow-y: auto;
+    padding: 22px 24px; position: relative; line-height: 1.55;
+  }
+  #guide-card h2 { margin: 0 0 4px; font-size: 19px; }
+  #guide-card h3 { margin: 18px 0 4px; font-size: 14.5px; color: var(--accent); }
+  #guide-card p, #guide-card ul { margin: 6px 0; color: var(--ink); font-size: 13.5px; }
+  #guide-card ul { padding-left: 20px; }
+  #guide-card li { margin: 3px 0; }
+  #guide-card .dim { color: var(--dim); }
+  #guide-card kbd {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 4px; padding: 0 5px; font: 12px ui-monospace, monospace;
+  }
+  #guide-close {
+    position: sticky; float: right; top: 0; margin: -6px -8px 0 12px;
+    font-size: 20px; line-height: 1; padding: 4px 9px;
+  }
+  #guide-start { display: block; margin: 18px auto 2px; padding: 9px 22px;
+    background: rgba(232,193,90,0.18); border-color: var(--accent); color: var(--accent);
+    font-weight: 600; }
+
   /* Phones: the panel becomes a bottom sheet and the scene gets the rest */
   @media (max-width: 720px) {
     #scene { bottom: 42vh; bottom: 42dvh; }
@@ -129,9 +160,90 @@
     <button class="mode" data-mode="now" title="Show only the present turn (key: n)">Now</button>
     <button class="mode active" data-mode="all" title="Show every turn since the start (key: a)">All</button>
     <button id="stereo" title="Red/blue anaglyph 3D, for red/blue glasses (key: s)">Stereo</button>
+    <button id="guidebtn" title="How to play (key: h)">Guide</button>
   </div>
   <div id="queue"></div>
   <div id="log"></div>
+</div>
+
+<div id="guide" hidden>
+  <div id="guide-card">
+    <button id="guide-close" title="Close (Esc)">&times;</button>
+    <h2>How to play Time Chess</h2>
+    <p class="dim">Chess, extruded into the time dimension.</p>
+
+    <h3>The board is the whole history</h3>
+    <p>Each layer of the stack is one turn — the top layer is <em>now</em>,
+    and every layer below it is a past turn, frozen where it happened. A new
+    layer appears after every move. You can only command pieces on the top
+    layer, but their moves can point into the past or the future.</p>
+
+    <h3>Moving</h3>
+    <p>Tap or click one of your pieces on the top layer, then tap a
+    highlighted square: <span style="color:#7fc97f">green</span> to move,
+    <span style="color:#e06c5f">red</span> to capture. Moves within the top
+    layer are ordinary chess. Highlights on other layers are time travel —
+    each piece moves through time the same way it moves through space (a
+    rook slides straight through turns, a knight jumps 2&times;1, and so on).
+    Pieces block each other in time just as they do in space.</p>
+
+    <h3>Forward in time</h3>
+    <p>The piece vanishes now and lands on a future turn — a ghost marks
+    where it will arrive. The catch: the future isn't settled yet. If the
+    landing goes wrong when the moment comes (the square or path got
+    blocked), the piece is <strong>Lost in Time</strong> and never returns.
+    Lose your King this way and you lose the game. You can weaponise this:
+    occupying an enemy traveller's landing square destroys it — though a
+    sliding piece attacks along its arrival line and will capture you
+    instead if it can.</p>
+
+    <h3>Backward in time</h3>
+    <p>The piece appears on a past turn and stands there, <em>braindead</em>,
+    repeated on every layer up to the present — it can't be commanded until
+    it catches up to now, and if history already put a piece on that square,
+    it gets <strong>steamrollered</strong> and destroyed. Capturing a piece
+    in the past erases it from that moment onward — everything it went on to
+    do stays done, but the piece itself (and anything it became) vanishes
+    from every later turn. There are no paradoxes; what happened, happened.</p>
+
+    <h3>Check works on your past too</h3>
+    <p>Your King is in check if <em>any</em> of its selves — present or past
+    — can be captured by an enemy piece moving now. Dodging into the future
+    doesn't save a king whose history is exposed, which is why checkmate
+    here means covering the king's past as well as its present.</p>
+
+    <h3>How games end</h3>
+    <ul>
+      <li>Checkmate, or a King Lost in Time.</li>
+      <li>Draw: stalemate, threefold repetition of the recent position
+        (the last 8 turns are all that can still matter), or fifty moves
+        each without a capture, a loss to time, or a pawn move.</li>
+    </ul>
+
+    <h3>Controls</h3>
+    <ul>
+      <li><strong>Orbit</strong> drag (one finger) &middot;
+        <strong>zoom</strong> wheel or pinch &middot;
+        <strong>pan</strong> right-drag (two fingers)</li>
+      <li><kbd>n</kbd>/<kbd>r</kbd>/<kbd>a</kbd> show Now / Recent / All turns
+        &middot; <kbd>u</kbd> undo &middot; <kbd>c</kbd> AI move &middot;
+        <kbd>s</kbd> stereo &middot; <kbd>h</kbd> this guide</li>
+      <li>The AI plays Black by default — change who it plays (or watch it
+        play itself) and its thinking time with the two dropdowns.</li>
+    </ul>
+
+    <h3>First-game tips</h3>
+    <ul>
+      <li>Watch the event log on the panel: it narrates every arrival,
+        loss, and capture in plain words.</li>
+      <li>Time-hops are tempting and usually fatal — a piece sent forward
+        needs its landing kept safe for every turn in between.</li>
+      <li>A piece that seems safe can still be attacked <em>in the past</em>.
+        Guard your King's history, not just its square.</li>
+    </ul>
+
+    <button id="guide-start">Play</button>
+  </div>
 </div>
 
 <div id="hover"></div>

@@ -50,7 +50,8 @@ entirely in the visitor's browser, in a Web Worker.
 | `s` | red/blue anaglyph stereo (for red/blue glasses, as in the original) |
 | `u` | undo (against the AI it takes back its reply and your move together) |
 | `c` | AI move: the built-in AI plays one move for the side to move |
-| `Esc` | deselect |
+| `h` | the how-to-play guide (also opens automatically on first visit) |
+| `Esc` | close the guide / deselect |
 
 By default the page is set to **AI plays Black**: make a move as White and
 the AI answers by itself. The dropdowns in the panel choose who the AI plays
