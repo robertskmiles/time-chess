@@ -54,8 +54,9 @@ controls.dampingFactor = 0.08;
 controls.maxDistance = 70;
 controls.minDistance = 3;
 
-let anaglyph = null; // lazily created stereo effect
-let stereoOn = false;
+let anaglyph = null; // lazily created anaglyph effect
+let stereoMode = 'off'; // 'off' | 'anaglyph' | 'cross' (cross-eye side-by-side)
+const stereoCamera = new THREE.StereoCamera(); // aspect set per frame in renderCrossEye
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.55));
 const key = new THREE.DirectionalLight(0xffffff, 1.6);
@@ -140,6 +141,13 @@ const gridNowMat = new THREE.LineBasicMaterial({ color: 0x9fb2d8, transparent: t
 const gridPastMat = new THREE.LineBasicMaterial({ color: 0x39415a, transparent: true, opacity: 0.8 });
 const gridFutureMat = new THREE.LineBasicMaterial({ color: 0x2e3450, transparent: true, opacity: 0.6 });
 
+// faint board surface under each grid, so layers read as separate planes
+const surfaceGeometry = new THREE.PlaneGeometry(8, 8).rotateX(-Math.PI / 2);
+const surfaceMat = new THREE.MeshBasicMaterial({
+  color: 0xc8ced9, transparent: true, opacity: 0.1,
+  depthWrite: false, side: THREE.DoubleSide,
+});
+
 // ---------------------------------------------------------------------------
 // Game + dynamic scene state
 // ---------------------------------------------------------------------------
@@ -178,12 +186,16 @@ function rebuild() {
 
   const turns = visibleTurns();
 
-  // board grids
+  // board grids, each on a faint translucent surface
   for (const t of turns) {
     const mat = t === engine.t ? gridNowMat : (t > engine.t ? gridFutureMat : gridPastMat);
     const grid = new THREE.LineSegments(gridGeometry, mat);
     grid.position.y = t * GAP;
     dynamic.add(grid);
+
+    const surface = new THREE.Mesh(surfaceGeometry, surfaceMat);
+    surface.position.set(3.5, t * GAP - 0.02, 3.5);
+    dynamic.add(surface);
   }
 
   // pieces, one InstancedMesh per (type, colour)
@@ -294,7 +306,17 @@ let downAt = null;
 
 function setPointer(ev) {
   const r = renderer.domElement.getBoundingClientRect();
-  pointer.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+  if (stereoMode === 'cross') {
+    // each half shows the same scene through a narrower frustum; map a click
+    // in either half back onto the full-frame ray (the remaining eye offset
+    // is a few pixels, well under a square's width)
+    const { x0, half } = crossLayout();
+    let hx = ev.clientX - r.left - x0;
+    if (hx >= half) hx -= half;
+    pointer.x = ((hx / half) * 2 - 1) * stereoCamera.aspect;
+  } else {
+    pointer.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+  }
   pointer.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
 }
 
@@ -537,17 +559,105 @@ document.querySelectorAll('.mode').forEach((b) => {
   b.addEventListener('click', () => setMode(b.dataset.mode));
 });
 
-function toggleStereo() {
-  stereoOn = !stereoOn;
-  if (stereoOn && !anaglyph) {
-    anaglyph = new AnaglyphEffect(renderer, viewSize().w, viewSize().h);
+const STEREO_MODES = ['off', 'anaglyph', 'cross'];
+function setStereo(mode) {
+  stereoMode = mode;
+  if (mode === 'anaglyph') {
+    if (!anaglyph) anaglyph = new AnaglyphEffect(renderer, viewSize().w, viewSize().h);
+    anaglyph.setSize(viewSize().w, viewSize().h);
   }
-  if (stereoOn) anaglyph.setSize(viewSize().w, viewSize().h);
-  el('stereo').classList.toggle('active', stereoOn);
+  const b = el('stereo');
+  b.classList.toggle('active', mode !== 'off');
+  b.textContent = mode === 'off' ? 'Stereo'
+    : mode === 'anaglyph' ? 'Stereo: anaglyph' : 'Stereo: cross-eye';
 }
-el('stereo').addEventListener('click', toggleStereo);
+function cycleStereo() {
+  setStereo(STEREO_MODES[(STEREO_MODES.indexOf(stereoMode) + 1) % STEREO_MODES.length]);
+}
+el('stereo').addEventListener('click', cycleStereo);
+
+/** The stereo pair sits in the part of the canvas the side panel doesn't
+ *  cover (on desktop the full-window canvas runs underneath the panel). */
+function crossLayout() {
+  const { w, h } = viewSize();
+  const panel = el('panel').getBoundingClientRect();
+  const x0 = panel.left === 0 && panel.top === 0 && panel.height >= h && panel.width < w
+    ? panel.width : 0; // side-panel layout; the phone bottom-sheet needs no inset
+  return { w, h, x0, half: (w - x0) / 2 };
+}
+
+/** Side-by-side for free viewing: crossed eyes, so the RIGHT eye's image
+ *  goes on the LEFT half and vice versa. */
+function renderCrossEye() {
+  const { w, h, x0, half } = crossLayout();
+  // eye separation scaled to the viewing distance (~2° stereo base), so the
+  // disparity stays comfortable at any zoom
+  stereoCamera.eyeSep = camera.focus / 30;
+  stereoCamera.aspect = half / w; // eye aspect = camera.aspect * this = half/h
+  stereoCamera.update(camera);
+  renderer.setScissorTest(true);
+  if (x0 > 0) { // keep the strip under the translucent panel from going stale
+    renderer.setScissor(0, 0, x0, h);
+    renderer.setClearColor(scene.background);
+    renderer.clear();
+  }
+  renderer.setScissor(x0, 0, half, h);
+  renderer.setViewport(x0, 0, half, h);
+  renderer.render(scene, stereoCamera.cameraR);
+  renderer.setScissor(x0 + half, 0, half, h);
+  renderer.setViewport(x0 + half, 0, half, h);
+  renderer.render(scene, stereoCamera.cameraL);
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, w, h);
+}
 
 // --- the how-to-play guide (shown automatically on the first visit) ------
+// The text lives in GUIDE.md so it can be edited without touching code.
+// This renders the small subset of markdown the guide uses: #/## headings,
+// paragraphs, - lists, **bold**, *italic*, `key` (as <kbd>), raw HTML through.
+
+function mdToHtml(md) {
+  const inline = (s) => s
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<kbd>$1</kbd>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  const out = [];
+  let inList = false;
+  let para = [];
+  const flushPara = () => {
+    if (para.length) { out.push(`<p>${inline(para.join(' '))}</p>`); para = []; }
+  };
+  const closeList = () => { if (inList) { out.push('</ul>'); inList = false; } };
+  for (const raw of md.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) { flushPara(); closeList(); continue; }
+    if (line.startsWith('- ')) {
+      flushPara();
+      if (!inList) { out.push('<ul>'); inList = true; }
+      out.push(`<li>${inline(line.slice(2))}</li>`);
+      continue;
+    }
+    if (inList && /^\s/.test(raw)) { // continuation of a wrapped list item
+      out[out.length - 1] = out[out.length - 1].replace(/<\/li>$/, ` ${inline(line)}</li>`);
+      continue;
+    }
+    closeList();
+    const h = line.match(/^(#{1,2}) (.*)/);
+    if (h) { flushPara(); const n = h[1].length + 1; out.push(`<h${n}>${inline(h[2])}</h${n}>`); }
+    else para.push(line);
+  }
+  flushPara(); closeList();
+  return out.join('\n');
+}
+
+fetch('./GUIDE.md')
+  .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
+  .then((md) => { el('guide-content').innerHTML = mdToHtml(md); })
+  .catch(() => {
+    el('guide-content').innerHTML =
+      '<p class="dim">Could not load GUIDE.md — it should sit next to index.html.</p>';
+  });
+
 const guideEl = el('guide');
 function showGuide(show) {
   guideEl.hidden = !show;
@@ -571,7 +681,7 @@ window.addEventListener('keydown', (ev) => {
   if (k === 'n') setMode('now');
   else if (k === 'r') setMode('recent');
   else if (k === 'a') setMode('all');
-  else if (k === 's') toggleStereo();
+  else if (k === 's') cycleStereo();
   else if (k === 'u') el('undo').click();
   else if (k === 'c') aiMove();
   else if (k === 'escape' && selected) deselect();
@@ -601,7 +711,11 @@ function animate() {
     camera.position.y += dy;
   }
   controls.update();
-  if (stereoOn) anaglyph.render(scene, camera);
+  // both stereo effects converge the eyes at camera.focus; put that on the
+  // orbit target rather than three.js's fixed default of 10 units
+  if (stereoMode !== 'off') camera.focus = camera.position.distanceTo(controls.target);
+  if (stereoMode === 'anaglyph') anaglyph.render(scene, camera);
+  else if (stereoMode === 'cross') renderCrossEye();
   else renderer.render(scene, camera);
 }
 

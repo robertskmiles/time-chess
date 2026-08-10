@@ -47,7 +47,7 @@ entirely in the visitor's browser, in a Web Worker.
 | click a piece in the top layer | select it; legal moves highlight (green = move, red = capture) |
 | click a highlighted square | make that move |
 | `n` / `r` / `a` | show Now only / Recent turns / All turns |
-| `s` | red/blue anaglyph stereo (for red/blue glasses, as in the original) |
+| `s` | cycle stereo 3D: red/blue anaglyph (as in the original), then cross-eye side-by-side, then off |
 | `u` | undo (against the AI it takes back its reply and your move together) |
 | `c` | AI move: the built-in AI plays one move for the side to move |
 | `h` | the how-to-play guide (also opens automatically on first visit) |
@@ -105,6 +105,7 @@ so anything written against the 2011 engine interface still works.
 
 ```
 index.html        the game page (UI shell, import map)
+GUIDE.md          the in-game how-to-play guide (edit this to change the guide text)
 src/engine.js     rules engine — pure, dependency-free, browser + Node
 src/ai.js         AI player — alpha-beta search + evaluation (see AI-REPORT.md)
 src/ui.js         Three.js interface

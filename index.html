@@ -96,6 +96,7 @@
   #guide-card ul { padding-left: 20px; }
   #guide-card li { margin: 3px 0; }
   #guide-card .dim { color: var(--dim); }
+  #guide-content h2 + p { color: var(--dim); } /* the subtitle line under the title */
   #guide-card kbd {
     background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
     border-radius: 4px; padding: 0 5px; font: 12px ui-monospace, monospace;
@@ -159,7 +160,7 @@
     <button class="mode" data-mode="recent" title="Show the present and the last few turns (key: r)">Recent</button>
     <button class="mode" data-mode="now" title="Show only the present turn (key: n)">Now</button>
     <button class="mode active" data-mode="all" title="Show every turn since the start (key: a)">All</button>
-    <button id="stereo" title="Red/blue anaglyph 3D, for red/blue glasses (key: s)">Stereo</button>
+    <button id="stereo" title="Stereo 3D: press to cycle anaglyph (red/blue glasses) and cross-eye side-by-side (key: s)">Stereo</button>
     <button id="guidebtn" title="How to play (key: h)">Guide</button>
   </div>
   <div id="queue"></div>
@@ -169,86 +170,8 @@
 <div id="guide" hidden>
   <div id="guide-card">
     <button id="guide-close" title="Close (Esc)">&times;</button>
-    <h2>How to play Time Chess</h2>
-    <p class="dim">Chess, extruded into the time dimension.</p>
-
-    <h3>The board is the whole history</h3>
-    <p>Each layer of the stack is one turn — the top layer is <em>now</em>,
-    and every layer below it is a past turn, frozen where it happened. A new
-    layer appears after every move. You can only command pieces on the top
-    layer, but their moves can point into the past or the future.</p>
-
-    <h3>Moving</h3>
-    <p>Tap or click one of your pieces on the top layer, then tap a
-    highlighted square: <span style="color:#7fc97f">green</span> to move,
-    <span style="color:#e06c5f">red</span> to capture. Moves within the top
-    layer are ordinary chess. Highlights on other layers are time travel —
-    each piece moves through time the same way it moves through space (a
-    rook slides straight through turns, a knight jumps 2&times;1, and so on).
-    Pieces block each other in time just as they do in space.</p>
-
-    <h3>Forward in time</h3>
-    <p>The piece vanishes now and lands on a future turn — a ghost marks
-    where it will arrive. The catch: the future isn't settled yet. If its
-    booked move has become illegal when the moment comes, the piece is
-    <strong>Lost in Time</strong> and never returns. Lose your King this way
-    and you lose the game.</p>
-    <p><strong>Fighting a piece in transit.</strong> Careful: a traveller
-    attacks its destination, so blockading the landing square with an
-    ordinary piece just gets you captured when it arrives. What does work:
-    block its <em>route</em> — any square its move passes through on the way
-    (for a piece hopping straight through time, that's its own square during
-    any turn in between); capture its past self before the moment it
-    departed, so the move never happened; or stand a King on the
-    destination — Kings are never captured, so the arrival simply fails.
-    Pawns hopping straight through time are the exception: that move can't
-    capture, so any blocker on their square kills them.</p>
-
-    <h3>Backward in time</h3>
-    <p>The piece appears on a past turn and stands there, <em>braindead</em>,
-    repeated on every layer up to the present — it can't be commanded until
-    it catches up to now, and if history already put a piece on that square,
-    it gets <strong>steamrollered</strong> and destroyed. Capturing a piece
-    in the past erases it from that moment onward — everything it went on to
-    do stays done, but the piece itself (and anything it became) vanishes
-    from every later turn. There are no paradoxes; what happened, happened.</p>
-
-    <h3>Check works on your past too</h3>
-    <p>Your King is in check if <em>any</em> of its selves — present or past
-    — can be captured by an enemy piece moving now. Dodging into the future
-    doesn't save a king whose history is exposed, which is why checkmate
-    here means covering the king's past as well as its present.</p>
-
-    <h3>How games end</h3>
-    <ul>
-      <li>Checkmate, or a King Lost in Time.</li>
-      <li>Draw: stalemate, threefold repetition of the recent position
-        (the last 8 turns are all that can still matter), or fifty moves
-        each without a capture, a loss to time, or a pawn move.</li>
-    </ul>
-
-    <h3>Controls</h3>
-    <ul>
-      <li><strong>Orbit</strong> drag (one finger) &middot;
-        <strong>zoom</strong> wheel or pinch &middot;
-        <strong>pan</strong> right-drag (two fingers)</li>
-      <li><kbd>n</kbd>/<kbd>r</kbd>/<kbd>a</kbd> show Now / Recent / All turns
-        &middot; <kbd>u</kbd> undo &middot; <kbd>c</kbd> AI move &middot;
-        <kbd>s</kbd> stereo &middot; <kbd>h</kbd> this guide</li>
-      <li>The AI plays Black by default — change who it plays (or watch it
-        play itself) and its thinking time with the two dropdowns.</li>
-    </ul>
-
-    <h3>First-game tips</h3>
-    <ul>
-      <li>Watch the event log on the panel: it narrates every arrival,
-        loss, and capture in plain words.</li>
-      <li>Time-hops are tempting and usually fatal — a piece sent forward
-        needs its landing kept safe for every turn in between.</li>
-      <li>A piece that seems safe can still be attacked <em>in the past</em>.
-        Guard your King's history, not just its square.</li>
-    </ul>
-
+    <!-- filled from GUIDE.md — edit that file to change the guide -->
+    <div id="guide-content"><p class="dim">Loading guide&hellip;</p></div>
     <button id="guide-start">Play</button>
   </div>
 </div>
