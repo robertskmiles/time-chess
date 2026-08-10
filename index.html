@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#7e848e">
 <title>Time Chess</title>
 <style>
   :root {
@@ -75,6 +76,27 @@
 
   #queue { font-size: 12.5px; color: var(--dim); }
   #queue span { color: var(--ink); }
+
+  /* Phones: the panel becomes a bottom sheet and the scene gets the rest */
+  @media (max-width: 720px) {
+    #scene { bottom: 42vh; bottom: 42dvh; }
+    #panel {
+      top: auto; left: 0; right: 0; bottom: 0; width: auto;
+      height: 42vh; height: 42dvh;
+      border-right: none; border-top: 1px solid rgba(255,255,255,0.12);
+      padding: 10px 12px; gap: 8px;
+    }
+    h1 { font-size: 16px; }
+    h1 small { display: none; }
+    #log { font-size: 12px; }
+    #help { display: none; } /* it describes mouse controls */
+  }
+
+  /* Touch: bigger targets, and no hover readout (taps would pin it) */
+  @media (pointer: coarse) {
+    button, .mode, select { padding: 9px 12px; }
+    #hover { display: none; }
+  }
 </style>
 </head>
 <body>

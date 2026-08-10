@@ -27,9 +27,15 @@ const RECENT_TURNS = 6;
 const worldPos = (x, y, t) => new THREE.Vector3(x, t * GAP, 7 - y);
 
 const container = document.getElementById('scene');
+// the scene box is not the whole window on phones (the panel becomes a
+// bottom sheet), so all sizing follows the container, not the window
+const viewSize = () => ({
+  w: container.clientWidth || window.innerWidth,
+  h: container.clientHeight || window.innerHeight,
+});
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(viewSize().w, viewSize().h);
 container.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -38,7 +44,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x7e848e);
 scene.fog = new THREE.Fog(0x7e848e, 40, 90);
 
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 200);
+const camera = new THREE.PerspectiveCamera(45, viewSize().w / viewSize().h, 0.1, 200);
 camera.position.set(14, 9, 16);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -338,7 +344,9 @@ renderer.domElement.addEventListener('pointerup', (ev) => {
   if (!downAt) return;
   const drag = Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y);
   downAt = null;
-  if (drag > 6 || ev.button !== 0) return; // that was an orbit, not a click
+  // fingers wobble more than mice: allow a bigger tap radius on touch
+  const tapRadius = ev.pointerType === 'touch' ? 14 : 6;
+  if (drag > tapRadius || ev.button !== 0) return; // that was an orbit, not a click
 
   const hit = pick(ev);
   if (!hit) { if (selected) deselect(); return; }
@@ -532,9 +540,9 @@ document.querySelectorAll('.mode').forEach((b) => {
 function toggleStereo() {
   stereoOn = !stereoOn;
   if (stereoOn && !anaglyph) {
-    anaglyph = new AnaglyphEffect(renderer, window.innerWidth, window.innerHeight);
+    anaglyph = new AnaglyphEffect(renderer, viewSize().w, viewSize().h);
   }
-  if (stereoOn) anaglyph.setSize(window.innerWidth, window.innerHeight);
+  if (stereoOn) anaglyph.setSize(viewSize().w, viewSize().h);
   el('stereo').classList.toggle('active', stereoOn);
 }
 el('stereo').addEventListener('click', toggleStereo);
@@ -552,10 +560,11 @@ window.addEventListener('keydown', (ev) => {
 });
 
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  const { w, h } = viewSize();
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  if (anaglyph) anaglyph.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(w, h);
+  if (anaglyph) anaglyph.setSize(w, h);
 });
 
 // ---------------------------------------------------------------------------
