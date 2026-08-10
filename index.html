@@ -23,26 +23,35 @@
   #scene { position: fixed; inset: 0; }
   #scene canvas { display: block; }
 
+  /* The main bar sits along the bottom so stereo modes get the full width */
   #panel {
-    position: fixed; top: 0; left: 0; bottom: 0; width: 320px;
+    position: fixed; left: 0; right: 0; bottom: 0;
     background: var(--panel); backdrop-filter: blur(10px);
-    border-right: 1px solid rgba(255,255,255,0.07);
-    display: flex; flex-direction: column; padding: 16px; gap: 12px;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 10px 14px;
   }
-  h1 { font-size: 20px; margin: 0; letter-spacing: 0.5px; }
-  h1 small { color: var(--dim); font-weight: 400; font-size: 12px; display: block; }
+  #identity { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+  h1 { font-size: 17px; margin: 0; letter-spacing: 0.5px; }
+  h1 small { display: none; }
 
-  #turnline { display: flex; align-items: center; gap: 10px; }
-  #sidechip { display: inline-block; padding: 3px 12px; border-radius: 999px; font-weight: 600; }
+  #turnline { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  #sidechip { display: inline-block; padding: 2px 12px; border-radius: 999px; font-weight: 600; }
   #sidechip.w { background: var(--white-chip); color: #111; }
   #sidechip.b { background: var(--black-chip); color: #eee; border: 1px solid #555; }
   #turnnum { color: var(--dim); }
 
-  #banner { display: none; padding: 10px 12px; border-radius: 8px; font-weight: 600;
+  #status { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex-shrink: 0;
+    max-width: 230px; }
+  #banner { display: none; padding: 6px 12px; border-radius: 8px; font-weight: 600;
     background: rgba(232,193,90,0.15); border: 1px solid rgba(232,193,90,0.4); color: var(--accent); }
   #banner.show { display: block; }
 
-  #controls { display: flex; flex-wrap: wrap; gap: 6px; }
+  #controls { display: flex; flex-wrap: wrap; gap: 6px; max-width: 520px; flex-shrink: 0; }
+  #controls .slider { display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 7px; padding: 6px 10px; font-size: 12px; color: var(--dim); }
+  #controls .slider input { width: 74px; accent-color: var(--accent); margin: 0; }
   button, .mode, select {
     background: rgba(255,255,255,0.06); color: var(--ink);
     border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;
@@ -53,8 +62,23 @@
   button:disabled { opacity: 0.55; cursor: default; }
   .mode.active { background: rgba(232,193,90,0.2); border-color: var(--accent); color: var(--accent); }
 
-  #log { flex: 1; overflow-y: auto; display: flex; flex-direction: column;
-    gap: 3px; font-size: 12.5px; padding-right: 4px; }
+  /* The log rides in the bar showing the last event or two; the arrow
+     button floats it upward as its own panel for the full history */
+  #logwrap { flex: 1; position: relative; min-width: 220px; height: 88px; } /* ~3 events */
+  #log { overflow-y: auto; display: flex; flex-direction: column;
+    gap: 3px; font-size: 12.5px; padding-right: 30px; height: 100%;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
+  #logwrap.tall #log {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 45vh; height: 45dvh;
+    background: var(--panel); backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 10px 10px 0 0;
+    padding: 8px 30px 8px 8px;
+  }
+  #logexpand { position: absolute; top: 0; right: 0; z-index: 1; padding: 2px 7px;
+    font-size: 11px; line-height: 1.4; color: var(--dim); }
+  #logwrap.tall #logexpand { top: auto; bottom: calc(45vh - 27px); bottom: calc(45dvh - 27px); }
+  body.log-tall #help, body.log-tall #helpbtn { visibility: hidden; }
   #log .entry { padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.035); }
   #log .entry .t { color: var(--dim); margin-right: 6px; }
   #log .check, #log .checkmate, #log .gameOver { border-left: 3px solid var(--accent); }
@@ -68,11 +92,21 @@
     color: var(--ink); font-size: 13px; pointer-events: none; opacity: 0; transition: opacity .12s; }
   #hover.show { opacity: 1; }
 
-  #help { position: fixed; right: 14px; bottom: 12px; text-align: right;
-    color: var(--dim); font-size: 12px; pointer-events: none;
-    background: var(--panel); padding: 8px 12px; border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.08); }
-  #help b { color: var(--ink); font-weight: 600; }
+  /* The controls cheat-sheet fades to a small "?" shortly after load */
+  #help, #helpbtn { position: fixed; right: 14px;
+    bottom: calc(var(--bar-h, 70px) + 12px); }
+  #help { text-align: right;
+    color: var(--ink); font-size: 12px; pointer-events: none;
+    background: rgba(8, 10, 16, 0.95); padding: 8px 12px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.18);
+    transition: opacity .4s; }
+  #help.hidden { opacity: 0; }
+  #help b { color: #fff; font-weight: 600; }
+  #helpbtn { width: 30px; height: 30px; border-radius: 50%; padding: 0;
+    font-size: 15px; font-weight: 600; color: var(--ink);
+    background: rgba(8, 10, 16, 0.9); border-color: rgba(255,255,255,0.3);
+    opacity: 0; pointer-events: none; transition: opacity .4s; }
+  #helpbtn.show { opacity: 1; pointer-events: auto; }
 
   #queue { font-size: 12.5px; color: var(--dim); }
   #queue span { color: var(--ink); }
@@ -109,25 +143,19 @@
     background: rgba(232,193,90,0.18); border-color: var(--accent); color: var(--accent);
     font-weight: 600; }
 
-  /* Phones: the panel becomes a bottom sheet and the scene gets the rest */
-  @media (max-width: 720px) {
-    #scene { bottom: 42vh; bottom: 42dvh; }
-    #panel {
-      top: auto; left: 0; right: 0; bottom: 0; width: auto;
-      height: 42vh; height: 42dvh;
-      border-right: none; border-top: 1px solid rgba(255,255,255,0.12);
-      padding: 10px 12px; gap: 8px;
-    }
-    h1 { font-size: 16px; }
-    h1 small { display: none; }
-    #log { font-size: 12px; }
-    #help { display: none; } /* it describes mouse controls */
+  /* Narrow screens: drop the title and let the controls wrap */
+  @media (max-width: 900px) {
+    #identity h1 { display: none; }
+    #status { display: none; } /* check/queue also land in the log */
+    #logwrap { min-width: 140px; }
+    #panel { gap: 10px; padding: 8px 10px; }
   }
 
   /* Touch: bigger targets, and no hover readout (taps would pin it) */
   @media (pointer: coarse) {
     button, .mode, select { padding: 9px 12px; }
     #hover { display: none; }
+    #help, #helpbtn { display: none; } /* the help describes mouse controls */
   }
 </style>
 </head>
@@ -135,13 +163,14 @@
 <div id="scene"></div>
 
 <div id="panel">
-  <h1>Time Chess <small>chess, extruded into the time dimension &mdash; 2026 re-implementation of the 2011 original</small></h1>
-  <div id="turnline">
-    <span id="sidechip" class="w">White</span>
-    <span>to move</span>
-    <span id="turnnum">turn 0</span>
+  <div id="identity">
+    <h1 title="chess, extruded into the time dimension &mdash; 2026 re-implementation of the 2011 original">Time Chess</h1>
+    <div id="turnline">
+      <span id="sidechip" class="w">White</span>
+      <span>to move</span>
+      <span id="turnnum">turn 0</span>
+    </div>
   </div>
-  <div id="banner"></div>
   <div id="controls">
     <button id="newgame" title="Start a new game">New game</button>
     <button id="undo" title="Take back the last move">Undo</button>
@@ -160,11 +189,20 @@
     <button class="mode" data-mode="recent" title="Show the present and the last few turns (key: r)">Recent</button>
     <button class="mode" data-mode="now" title="Show only the present turn (key: n)">Now</button>
     <button class="mode active" data-mode="all" title="Show every turn since the start (key: a)">All</button>
+    <label class="slider" title="Opacity of the board surfaces">Board
+      <input type="range" id="boardopacity" min="0" max="100" value="10">
+    </label>
     <button id="stereo" title="Stereo 3D: press to cycle anaglyph (red/blue glasses) and cross-eye side-by-side (key: s)">Stereo</button>
     <button id="guidebtn" title="How to play (key: h)">Guide</button>
   </div>
-  <div id="queue"></div>
-  <div id="log"></div>
+  <div id="status">
+    <div id="banner"></div>
+    <div id="queue"></div>
+  </div>
+  <div id="logwrap">
+    <div id="log"></div>
+    <button id="logexpand" title="Expand the event log">&#9650;</button>
+  </div>
 </div>
 
 <div id="guide" hidden>
@@ -182,6 +220,7 @@
   <b>click</b> a piece in the top layer, then click a highlighted square<br>
   green = move &nbsp; red = capture &nbsp; each layer of the stack is one turn; time runs upward
 </div>
+<button id="helpbtn" title="Controls">?</button>
 
 <script type="importmap">
 {

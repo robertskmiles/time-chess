@@ -144,9 +144,17 @@ const gridFutureMat = new THREE.LineBasicMaterial({ color: 0x2e3450, transparent
 // faint board surface under each grid, so layers read as separate planes
 const surfaceGeometry = new THREE.PlaneGeometry(8, 8).rotateX(-Math.PI / 2);
 const surfaceMat = new THREE.MeshBasicMaterial({
-  color: 0xc8ced9, transparent: true, opacity: 0.1,
+  color: 0x969ca8, transparent: true, opacity: 0.1,
   depthWrite: false, side: THREE.DoubleSide,
 });
+
+// Transparent things are blended in draw order, and three.js's default
+// per-object distance sort snaps as the camera moves (one sample point per
+// object, so a whole highlight square pops when its order against a big
+// surface plane flips). Instead, draw the stack deterministically from the
+// bottom layer up; within a layer: surface, then grid, then markers/ghosts.
+const layerOrder = (t, within) => t + within;
+const ON_SURFACE = 0.3, ON_GRID = 0.6;
 
 // ---------------------------------------------------------------------------
 // Game + dynamic scene state
@@ -191,11 +199,15 @@ function rebuild() {
     const mat = t === engine.t ? gridNowMat : (t > engine.t ? gridFutureMat : gridPastMat);
     const grid = new THREE.LineSegments(gridGeometry, mat);
     grid.position.y = t * GAP;
+    grid.renderOrder = layerOrder(t, ON_SURFACE);
     dynamic.add(grid);
 
-    const surface = new THREE.Mesh(surfaceGeometry, surfaceMat);
-    surface.position.set(3.5, t * GAP - 0.02, 3.5);
-    dynamic.add(surface);
+    if (t <= engine.t) { // future layers hold no pieces; the grid is enough
+      const surface = new THREE.Mesh(surfaceGeometry, surfaceMat);
+      surface.position.set(3.5, t * GAP - 0.02, 3.5);
+      surface.renderOrder = layerOrder(t, 0);
+      dynamic.add(surface);
+    }
   }
 
   // pieces, one InstancedMesh per (type, colour)
@@ -232,6 +244,7 @@ function rebuild() {
       pieceGeometry[trav.type], trav.color === 'w' ? ghostWhiteMat : ghostBlackMat);
     ghost.position.copy(worldPos(trav.x, trav.y, trav.t));
     if (trav.color === 'b') ghost.rotation.y = Math.PI;
+    ghost.renderOrder = layerOrder(trav.t, ON_GRID);
     ghost.userData.ghost = trav;
     dynamic.add(ghost);
     clickTargets.push(ghost);
@@ -242,6 +255,7 @@ function rebuild() {
     const marker = new THREE.Mesh(highlightGeom, selectMat);
     marker.position.copy(worldPos(selected.x, selected.y, selected.t));
     marker.position.y += 0.05;
+    marker.renderOrder = layerOrder(selected.t, ON_GRID);
     dynamic.add(marker);
 
     for (const m of legalTargets) {
@@ -249,6 +263,7 @@ function rebuild() {
       const hl = new THREE.Mesh(highlightGeom, isCapture ? captureMat : moveMat);
       hl.position.copy(worldPos(m.to.x, m.to.y, m.to.t));
       hl.position.y += 0.05;
+      hl.renderOrder = layerOrder(m.to.t, ON_GRID);
       hl.userData.moveTarget = m;
       dynamic.add(hl);
       clickTargets.push(hl);
@@ -310,14 +325,17 @@ function setPointer(ev) {
     // each half shows the same scene through a narrower frustum; map a click
     // in either half back onto the full-frame ray (the remaining eye offset
     // is a few pixels, well under a square's width)
-    const { x0, half } = crossLayout();
-    let hx = ev.clientX - r.left - x0;
+    const { rh, half } = crossLayout();
+    let hx = ev.clientX - r.left;
     if (hx >= half) hx -= half;
     pointer.x = ((hx / half) * 2 - 1) * stereoCamera.aspect;
+    // the pair's region is the canvas minus the bar; same vertical fov as
+    // the mono camera, so its NDC y is the mono NDC y
+    pointer.y = -((ev.clientY - r.top) / rh) * 2 + 1;
   } else {
     pointer.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+    pointer.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
   }
-  pointer.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
 }
 
 function pick(ev) {
@@ -559,6 +577,19 @@ document.querySelectorAll('.mode').forEach((b) => {
   b.addEventListener('click', () => setMode(b.dataset.mode));
 });
 
+// board surface opacity slider (persisted across visits)
+const opacitySlider = el('boardopacity');
+const applyBoardOpacity = () => { surfaceMat.opacity = Number(opacitySlider.value) / 100; };
+opacitySlider.addEventListener('input', () => {
+  applyBoardOpacity();
+  try { localStorage.setItem('timechess-board-opacity', opacitySlider.value); } catch { /* private mode */ }
+});
+try {
+  const saved = localStorage.getItem('timechess-board-opacity');
+  if (saved !== null) opacitySlider.value = saved;
+} catch { /* no storage */ }
+applyBoardOpacity();
+
 const STEREO_MODES = ['off', 'anaglyph', 'cross'];
 function setStereo(mode) {
   stereoMode = mode;
@@ -576,40 +607,61 @@ function cycleStereo() {
 }
 el('stereo').addEventListener('click', cycleStereo);
 
-/** The stereo pair sits in the part of the canvas the side panel doesn't
- *  cover (on desktop the full-window canvas runs underneath the panel). */
+/** The stereo pair sits above the bottom bar (which overlays the bottom of
+ *  the full-window canvas). */
 function crossLayout() {
   const { w, h } = viewSize();
-  const panel = el('panel').getBoundingClientRect();
-  const x0 = panel.left === 0 && panel.top === 0 && panel.height >= h && panel.width < w
-    ? panel.width : 0; // side-panel layout; the phone bottom-sheet needs no inset
-  return { w, h, x0, half: (w - x0) / 2 };
+  const barH = Math.min(el('panel').offsetHeight, h / 2);
+  return { w, h, barH, rh: h - barH, half: w / 2 };
 }
 
 /** Side-by-side for free viewing: crossed eyes, so the RIGHT eye's image
  *  goes on the LEFT half and vice versa. */
 function renderCrossEye() {
-  const { w, h, x0, half } = crossLayout();
+  const { w, h, barH, rh, half } = crossLayout();
   // eye separation scaled to the viewing distance (~2° stereo base), so the
   // disparity stays comfortable at any zoom
   stereoCamera.eyeSep = camera.focus / 30;
-  stereoCamera.aspect = half / w; // eye aspect = camera.aspect * this = half/h
+  stereoCamera.aspect = (half / rh) / camera.aspect; // eye frustum fits a half
   stereoCamera.update(camera);
   renderer.setScissorTest(true);
-  if (x0 > 0) { // keep the strip under the translucent panel from going stale
-    renderer.setScissor(0, 0, x0, h);
+  if (barH > 0) { // keep the strip under the translucent bar from going stale
+    renderer.setScissor(0, 0, w, barH);
     renderer.setClearColor(scene.background);
     renderer.clear();
   }
-  renderer.setScissor(x0, 0, half, h);
-  renderer.setViewport(x0, 0, half, h);
+  renderer.setScissor(0, barH, half, rh);
+  renderer.setViewport(0, barH, half, rh);
   renderer.render(scene, stereoCamera.cameraR);
-  renderer.setScissor(x0 + half, 0, half, h);
-  renderer.setViewport(x0 + half, 0, half, h);
+  renderer.setScissor(half, barH, half, rh);
+  renderer.setViewport(half, barH, half, rh);
   renderer.render(scene, stereoCamera.cameraL);
   renderer.setScissorTest(false);
   renderer.setViewport(0, 0, w, h);
 }
+
+// --- bottom bar chrome ---------------------------------------------------
+
+// the help card and "?" button sit just above the bar, wherever it ends up
+new ResizeObserver(() => {
+  document.documentElement.style.setProperty('--bar-h', `${el('panel').offsetHeight}px`);
+}).observe(el('panel'));
+
+// the controls cheat-sheet fades to a "?" once the first game is underway
+const helpEl = el('help');
+const helpBtn = el('helpbtn');
+setTimeout(() => {
+  helpEl.classList.add('hidden');
+  helpBtn.classList.add('show');
+}, 15000);
+helpBtn.addEventListener('click', () => helpEl.classList.toggle('hidden'));
+
+// the log shows the last event or two; the arrow grows it upward
+el('logexpand').addEventListener('click', () => {
+  const tall = el('logwrap').classList.toggle('tall');
+  document.body.classList.toggle('log-tall', tall); // the help yields to it
+  el('logexpand').innerHTML = tall ? '&#9660;' : '&#9650;';
+});
 
 // --- the how-to-play guide (shown automatically on the first visit) ------
 // The text lives in GUIDE.md so it can be edited without touching code.
