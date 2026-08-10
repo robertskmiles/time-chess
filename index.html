@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Time Chess</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: rgba(16, 20, 30, 0.82);
+    --ink: #d7dce6;
+    --dim: #8791a3;
+    --accent: #e8c15a;
+    --white-chip: #f0f0f0;
+    --black-chip: #262b36;
+    --danger: #e06c5f;
+    --ok: #7fc97f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); }
+  #scene { position: fixed; inset: 0; }
+  #scene canvas { display: block; }
+
+  #panel {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 320px;
+    background: var(--panel); backdrop-filter: blur(10px);
+    border-right: 1px solid rgba(255,255,255,0.07);
+    display: flex; flex-direction: column; padding: 16px; gap: 12px;
+  }
+  h1 { font-size: 20px; margin: 0; letter-spacing: 0.5px; }
+  h1 small { color: var(--dim); font-weight: 400; font-size: 12px; display: block; }
+
+  #turnline { display: flex; align-items: center; gap: 10px; }
+  #sidechip { display: inline-block; padding: 3px 12px; border-radius: 999px; font-weight: 600; }
+  #sidechip.w { background: var(--white-chip); color: #111; }
+  #sidechip.b { background: var(--black-chip); color: #eee; border: 1px solid #555; }
+  #turnnum { color: var(--dim); }
+
+  #banner { display: none; padding: 10px 12px; border-radius: 8px; font-weight: 600;
+    background: rgba(232,193,90,0.15); border: 1px solid rgba(232,193,90,0.4); color: var(--accent); }
+  #banner.show { display: block; }
+
+  #controls { display: flex; flex-wrap: wrap; gap: 6px; }
+  button, .mode, select {
+    background: rgba(255,255,255,0.06); color: var(--ink);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;
+    padding: 6px 10px; cursor: pointer; font: inherit; font-size: 13px;
+  }
+  button:hover, select:hover { background: rgba(255,255,255,0.12); }
+  select option { background: #1a1f2b; color: var(--ink); }
+  button:disabled { opacity: 0.55; cursor: default; }
+  .mode.active { background: rgba(232,193,90,0.2); border-color: var(--accent); color: var(--accent); }
+
+  #log { flex: 1; overflow-y: auto; display: flex; flex-direction: column;
+    gap: 3px; font-size: 12.5px; padding-right: 4px; }
+  #log .entry { padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.035); }
+  #log .entry .t { color: var(--dim); margin-right: 6px; }
+  #log .check, #log .checkmate, #log .gameOver { border-left: 3px solid var(--accent); }
+  #log .lostInTime, #log .neverHappened, #log .steamroller { border-left: 3px solid #9a7fd1; }
+  #log .capture, #log .pastCapture { border-left: 3px solid var(--danger); }
+  #log .illegal { border-left: 3px solid var(--danger); color: var(--danger); }
+  #log .arrival { border-left: 3px solid var(--ok); }
+
+  #hover { position: fixed; right: 14px; top: 12px; padding: 5px 11px; border-radius: 7px;
+    background: var(--panel); border: 1px solid rgba(255,255,255,0.1);
+    color: var(--ink); font-size: 13px; pointer-events: none; opacity: 0; transition: opacity .12s; }
+  #hover.show { opacity: 1; }
+
+  #help { position: fixed; right: 14px; bottom: 12px; text-align: right;
+    color: var(--dim); font-size: 12px; pointer-events: none;
+    background: var(--panel); padding: 8px 12px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.08); }
+  #help b { color: var(--ink); font-weight: 600; }
+
+  #queue { font-size: 12.5px; color: var(--dim); }
+  #queue span { color: var(--ink); }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+
+<div id="panel">
+  <h1>Time Chess <small>chess, extruded into the time dimension &mdash; 2026 re-implementation of the 2011 original</small></h1>
+  <div id="turnline">
+    <span id="sidechip" class="w">White</span>
+    <span>to move</span>
+    <span id="turnnum">turn 0</span>
+  </div>
+  <div id="banner"></div>
+  <div id="controls">
+    <button id="newgame" title="Start a new game">New game</button>
+    <button id="undo" title="Take back the last move">Undo</button>
+    <button id="aimove" title="Let the AI choose and play one move for the side to move (key: c)">AI move</button>
+    <select id="opponent" title="Who the AI plays for; it replies automatically on its turn">
+      <option value="b" selected>AI plays Black</option>
+      <option value="w">AI plays White</option>
+      <option value="both">AI vs AI</option>
+      <option value="none">Two players</option>
+    </select>
+    <select id="ailevel" title="AI thinking time per move">
+      <option value="500">Fast &middot; &frac12;s</option>
+      <option value="1500" selected>Normal &middot; 1&frac12;s</option>
+      <option value="4000">Strong &middot; 4s</option>
+    </select>
+    <button class="mode" data-mode="recent" title="Show the present and the last few turns (key: r)">Recent</button>
+    <button class="mode" data-mode="now" title="Show only the present turn (key: n)">Now</button>
+    <button class="mode active" data-mode="all" title="Show every turn since the start (key: a)">All</button>
+    <button id="stereo" title="Red/blue anaglyph 3D, for red/blue glasses (key: s)">Stereo</button>
+  </div>
+  <div id="queue"></div>
+  <div id="log"></div>
+</div>
+
+<div id="hover"></div>
+<div id="help">
+  <b>drag</b> orbit &nbsp; <b>wheel</b> zoom &nbsp; <b>right-drag</b> pan<br>
+  <b>click</b> a piece in the top layer, then click a highlighted square<br>
+  green = move &nbsp; red = capture &nbsp; each layer of the stack is one turn; time runs upward
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/addons/"
+  }
+}
+</script>
+<script type="module" src="./src/ui.js"></script>
+</body>
+</html>
