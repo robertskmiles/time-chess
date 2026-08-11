@@ -156,7 +156,9 @@
   @media (max-width: 720px) {
     #panel { flex-direction: column; align-items: stretch; gap: 8px; }
     #controls { max-width: none; }
-    #logwrap { min-width: 0; height: 62px; } /* ~2 events */
+    /* fixed-height scroll box: flex-basis and min-height 0, or the item's
+       min-content (every log entry) re-inflates it as the game goes on */
+    #logwrap { min-width: 0; flex: 0 0 62px; height: 62px; min-height: 0; } /* ~2 events */
   }
 
   /* Touch: bigger targets, and no hover readout (taps would pin it) */
