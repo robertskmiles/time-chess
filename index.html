@@ -149,6 +149,14 @@
     #status { display: none; } /* check/queue also land in the log */
     #logwrap { min-width: 140px; }
     #panel { gap: 10px; padding: 8px 10px; }
+    #controls { flex-shrink: 1; } /* wrap sooner rather than overflow the bar */
+  }
+
+  /* Phones: the bar's sections don't fit side by side; stack them */
+  @media (max-width: 720px) {
+    #panel { flex-direction: column; align-items: stretch; gap: 8px; }
+    #controls { max-width: none; }
+    #logwrap { min-width: 0; height: 62px; } /* ~2 events */
   }
 
   /* Touch: bigger targets, and no hover readout (taps would pin it) */
