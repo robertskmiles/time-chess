@@ -59,6 +59,13 @@
     padding: 6px 10px; cursor: pointer; font: inherit; font-size: 13px;
   }
   button:hover, select:hover { background: rgba(255,255,255,0.12); }
+  #moveinput {
+    width: 118px; background: rgba(255,255,255,0.06); color: var(--ink);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;
+    padding: 6px 10px; font: 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  #moveinput::placeholder { color: var(--dim); }
+  #moveinput:focus { outline: none; border-color: var(--accent); }
   select option { background: #1a1f2b; color: var(--ink); }
   button:disabled { opacity: 0.55; cursor: default; }
   .mode.active { background: rgba(232,193,90,0.2); border-color: var(--accent); color: var(--accent); }
@@ -183,6 +190,9 @@
     </div>
   </div>
   <div id="controls">
+    <input id="moveinput" placeholder="Type a move" spellcheck="false" autocomplete="off"
+      autocapitalize="off" enterkeyhint="go"
+      title="Enter a move and press Enter: &quot;e4&quot;, &quot;Nf3&quot;, &quot;e2e4&quot;, or full notation &quot;a2t0a4t0&quot;. Add tN for a time destination, e.g. &quot;Nf3t2&quot; or &quot;Nf3t+2&quot; (key: /)">
     <button id="newgame" title="Start a new game">New game</button>
     <button id="undo" title="Take back the last move">Undo</button>
     <button id="aimove" title="Let the AI choose and play one move for the side to move (key: c)">AI move</button>
@@ -229,6 +239,7 @@
 <div id="help">
   <b>drag</b> orbit &nbsp; <b>wheel</b> zoom &nbsp; <b>right-drag</b> pan<br>
   <b>click</b> a piece in the top layer, then click a highlighted square<br>
+  or <b>type</b> a move (key: /) &mdash; e4, Nf3, e2e4, or Nf3t2 to land on turn 2<br>
   green = move &nbsp; red = capture &nbsp; each layer of the stack is one turn; time runs upward
 </div>
 <button id="helpbtn" title="Controls">?</button>

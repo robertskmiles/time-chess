@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  Engine, strToPos, strToMove, posToStr, moveToStr, makeChild,
+  Engine, strToPos, strToMove, posToStr, moveToStr, makeChild, parseMoveInput,
 } from '../src/engine.js';
 
 // ---------------------------------------------------------------------------
@@ -535,4 +535,78 @@ test('a dead K vs K game is adjudicated (fifty-move rule or repetition)', () => 
   }
   assert.equal(e.status, 'draw');
   assert.match(e.statusReason, /fifty-move|repetition/);
+});
+
+// ---------------------------------------------------------------------------
+// Typed move input (parseMoveInput)
+// ---------------------------------------------------------------------------
+
+test('typed input: algebraic, coordinate, and TCECP forms all resolve', () => {
+  const forms = ['e4', 'e2e4', 'E2-E4', 'e2xe4', 'a2t0a4t0', 'a2t+0a4t+0'];
+  for (const s of forms) {
+    const e = new Engine();
+    const r = parseMoveInput(e, s);
+    assert.equal(r.ok, true, `${s}: ${r.reason}`);
+    assert.equal(e.attemptMove(r.move).ok, true, s);
+  }
+  const e = new Engine();
+  const r = parseMoveInput(e, 'Nf3');
+  assert.equal(r.ok, true);
+  assert.equal(moveToStr(r.move), 'g1t0f3t0');
+});
+
+test('typed input: tN suffix targets another turn, absolute and relative', () => {
+  for (const s of ['e2t2', 'e2t+2']) {
+    const e = new Engine();
+    const r = parseMoveInput(e, s);
+    assert.equal(r.ok, true, `${s}: ${r.reason}`);
+    assert.equal(moveToStr(r.move), 'e2t0e2t2', s);
+  }
+});
+
+test('typed input: SAN needs disambiguation when two pieces reach the square', () => {
+  const e = new Engine();
+  clearBoard(e);
+  place(e, 'k', 'w', 'e1t0');
+  place(e, 'k', 'b', 'e8t0');
+  place(e, 'r', 'w', 'a1t0');
+  place(e, 'r', 'w', 'a5t0');
+  const ambiguous = parseMoveInput(e, 'Ra3');
+  assert.equal(ambiguous.ok, false);
+  assert.match(ambiguous.reason, /Ambiguous/);
+  const r = parseMoveInput(e, 'R1a3');
+  assert.equal(r.ok, true);
+  assert.equal(moveToStr(r.move), 'a1t0a3t0');
+});
+
+test('typed input: lowercase leading b reads as the b-file, then the Bishop', () => {
+  const e = new Engine();
+  assert.equal(e.attemptMove('e2t0e4t0').ok, true);
+  assert.equal(e.attemptMove('e7t1e5t1').ok, true);
+  const r = parseMoveInput(e, 'bc4'); // no pawn move matches -> Bc4
+  assert.equal(r.ok, true, r.reason);
+  assert.equal(moveToStr(r.move), 'f1t2c4t2');
+});
+
+test('typed input: rejections come with a usable reason', () => {
+  const e = new Engine();
+  assert.match(parseMoveInput(e, 'O-O').reason, /castling/);
+  assert.match(parseMoveInput(e, 'Qh5').reason, /No Queen/);
+  assert.match(parseMoveInput(e, 'hello world').reason, /Could not read/);
+  assert.match(parseMoveInput(e, '   ').reason, /Type a move/);
+  // coordinate forms defer to checkMove for the detailed failure
+  const r = parseMoveInput(e, 'e5e6');
+  assert.equal(r.ok, true);
+  assert.match(e.attemptMove(r.move).reason, /no piece at e5t0/);
+});
+
+test('typed input: check marks and promotion suffixes are tolerated', () => {
+  const e = new Engine();
+  clearBoard(e);
+  place(e, 'k', 'w', 'a1t0');
+  place(e, 'k', 'b', 'h8t0');
+  place(e, 'p', 'w', 'e7t0', { moved: true });
+  const r = parseMoveInput(e, 'e8=Q+');
+  assert.equal(r.ok, true, r.reason);
+  assert.equal(moveToStr(r.move), 'e7t0e8t0');
 });

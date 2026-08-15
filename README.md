@@ -46,6 +46,7 @@ entirely in the visitor's browser, in a Web Worker.
 | wheel | zoom |
 | click a piece in the top layer | select it; legal moves highlight (green = move, red = capture) |
 | click a highlighted square | make that move |
+| type in the move box (key: `/`) | make a move by notation: algebraic (`e4`, `Nf3`, `exd5`, `Nbd2`), coordinate (`e2e4`), or full TCECP (`a2t0a4t0`); add `tN` to the destination for time travel (`Nf3t2`, or `Nf3t+2` relative to now) |
 | `n` / `r` / `a` | show Now only / Recent turns / All turns |
 | `s` | cycle stereo 3D: red/blue anaglyph (as in the original), then cross-eye side-by-side, then off |
 | `u` | undo (against the AI it takes back its reply and your move together) |

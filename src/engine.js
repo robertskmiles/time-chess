@@ -45,6 +45,78 @@ export function strToMove(s) {
 }
 
 const samePos = (a, b) => a.x === b.x && a.y === b.y && a.t === b.t;
+
+/**
+ * Parse a move typed by a human, resolved against the current position.
+ * Accepted forms:
+ *   - full TCECP:        "a2t0a4t0"
+ *   - coordinate:        "e2e4", "e2-e4", "d2xe3"  (times default to now)
+ *   - standard algebraic: "e4", "Nf3", "exd5", "Nbd2", "R1a3"
+ * A destination in another turn takes a t suffix, absolute ("Nf3t2") or
+ * relative to the present ("Nf3t+2"). Case-insensitive, except that a leading
+ * lowercase "b" reads as the b-file first and as the Bishop if no pawn move
+ * matches. Check marks (+, #) and promotion suffixes (=Q) are ignored —
+ * promotion is automatic.
+ *
+ * Returns {ok:true, move} or {ok:false, reason}. Algebraic forms only ever
+ * resolve to fully legal moves; coordinate forms are returned as written and
+ * left to checkMove, whose failure messages explain what went wrong.
+ */
+export function parseMoveInput(engine, raw) {
+  const fail = (reason) => ({ ok: false, reason });
+  let s = raw.replace(/\s+/g, '');
+  s = s.replace(/[+#!?]+$/, '').replace(/=[qnrb]$/i, '');
+  if (!s) return fail('Type a move first');
+  if (/^[o0](-?[o0])+$/i.test(s)) return fail('There is no castling in Time Chess');
+  if (engine.status !== 'playing') return fail(`The game is over (${engine.statusReason})`);
+
+  const sq = (fr) => ({ x: FILES.indexOf(fr[0]), y: Number(fr[1]) - 1 });
+  const time = (tok) => (tok === undefined ? engine.t
+    : /^[+-]/.test(tok) ? engine.t + Number(tok) : Number(tok));
+
+  // Coordinate forms, with or without explicit times.
+  let m = /^([a-h][1-8])(?:t([+-]?\d+))?[-x:>]?([a-h][1-8])(?:t([+-]?\d+))?$/
+    .exec(s.toLowerCase());
+  if (m) {
+    return { ok: true, move: {
+      from: { ...sq(m[1]), t: time(m[2]) },
+      to: { ...sq(m[3]), t: time(m[4]) },
+    } };
+  }
+
+  // Algebraic. A leading lowercase "b" could name the b-file or the Bishop;
+  // try the pawn reading first and fall back to the Bishop.
+  const readings = [];
+  if (/^[KQRNkqrnB]/.test(s)) readings.push({ type: s[0].toLowerCase(), rest: s.slice(1) });
+  else readings.push({ type: 'p', rest: s });
+  if (s[0] === 'b') readings.push({ type: 'b', rest: s.slice(1) });
+  let shaped = null; // first reading that at least looked like a move
+  for (const { type, rest } of readings) {
+    m = /^([a-h]?)([1-8]?)[x:]?([a-h][1-8])(?:t([+-]?\d+))?$/.exec(rest.toLowerCase());
+    if (!m) continue;
+    const to = { ...sq(m[3]), t: time(m[4]) };
+    if (!shaped) shaped = { type, to };
+    const matches = [];
+    for (const p of engine.presentPieces(engine.currentSide)) {
+      if (p.type !== type) continue;
+      if (m[1] && p.x !== FILES.indexOf(m[1])) continue;
+      if (m[2] && p.y !== Number(m[2]) - 1) continue;
+      for (const mv of engine.legalMoves({ x: p.x, y: p.y, t: p.t })) {
+        if (samePos(mv.to, to)) matches.push(mv);
+      }
+    }
+    if (matches.length === 1) return { ok: true, move: matches[0] };
+    if (matches.length > 1) {
+      return fail(`Ambiguous — ${matches.map(moveToStr).join(', ')} all match; ` +
+        'name the piece’s file or rank too (e.g. Nbd2, R1a3)');
+    }
+  }
+  if (shaped) {
+    return fail(`No ${PIECE_NAMES[shaped.type]} of yours can legally move to ${posToStr(shaped.to)}`);
+  }
+  return fail(`Could not read ${JSON.stringify(raw.trim())} as a move — ` +
+    'try "e4", "Nf3", "e2e4", or full notation like "a2t0a4t0"');
+}
 const idx = (x, y) => y * 8 + x;
 const encodePos = (x, y, t) => t * 64 + y * 8 + x;
 

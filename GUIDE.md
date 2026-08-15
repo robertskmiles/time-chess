@@ -62,6 +62,10 @@ save a king whose history is exposed.
   right-drag (two fingers)
 - `n`/`r`/`a` show Now / Recent / All turns · `u` undo · `c` AI move ·
   `s` cycle stereo (anaglyph, then cross-eye) · `h` this guide
+- You can also type moves into the box on the panel (`/` jumps there):
+  chess notation (`e4`, `Nf3`, `exd5`) or plain squares (`e2e4`), with
+  `tN` on the destination for time travel - `Nf3t2` lands on turn 2,
+  `Nf3t+2` two turns ahead.
 - The AI plays Black by default — change who it plays (or watch it
   play itself) and its thinking time with the two dropdowns.
 

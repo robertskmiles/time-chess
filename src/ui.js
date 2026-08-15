@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { AnaglyphEffect } from 'three/addons/effects/AnaglyphEffect.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { Engine, posToStr, moveToStr, humanString, COLOR_NAMES } from './engine.js';
+import { Engine, posToStr, moveToStr, humanString, parseMoveInput, COLOR_NAMES } from './engine.js';
 import { AI } from './ai.js';
 
 // ---------------------------------------------------------------------------
@@ -363,7 +363,7 @@ function tryMove(move) {
   const res = engine.attemptMove(move);
   if (!res.ok) {
     log('illegal', res.reason);
-    return;
+    return false;
   }
   gameStamp++;
   undoStack.push(backup);
@@ -374,7 +374,28 @@ function tryMove(move) {
   rebuild();
   updatePanel();
   scheduleAutoMove();
+  return true;
 }
+
+// typed move entry: algebraic ("e4", "Nf3"), coordinate ("e2e4"), or full
+// TCECP ("a2t0a4t0"); a tN suffix sends the destination to another turn
+const moveInput = el('moveinput');
+
+function submitTypedMove() {
+  if (!moveInput.value.trim()) return;
+  const parsed = parseMoveInput(engine, moveInput.value);
+  if (parsed.ok && tryMove(parsed.move)) {
+    moveInput.value = '';
+  } else {
+    if (!parsed.ok) log('illegal', parsed.reason);
+    moveInput.select(); // leave the text in place to fix and resubmit
+  }
+}
+
+moveInput.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter') submitTypedMove();
+  else if (ev.key === 'Escape') moveInput.blur();
+});
 
 renderer.domElement.addEventListener('pointerdown', (ev) => {
   downAt = { x: ev.clientX, y: ev.clientY };
@@ -730,7 +751,8 @@ window.addEventListener('keydown', (ev) => {
   const k = ev.key.toLowerCase();
   if (k === 'escape' && !guideEl.hidden) { showGuide(false); return; }
   if (k === 'h') { showGuide(guideEl.hidden); return; }
-  if (k === 'n') setMode('now');
+  if (k === '/') { moveInput.focus(); ev.preventDefault(); }
+  else if (k === 'n') setMode('now');
   else if (k === 'r') setMode('recent');
   else if (k === 'a') setMode('all');
   else if (k === 's') cycleStereo();
