@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#7e848e">
+<meta name="color-scheme" content="dark">
+<!-- already a dark page; stops Dark Reader repainting the piece colours -->
+<meta name="darkreader-lock">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <title>Time Chess</title>
 <style>
@@ -23,6 +26,44 @@
     font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); }
   #scene { position: fixed; inset: 0; }
   #scene canvas { display: block; }
+
+  /* The flat 2D view: one board per turn, left to right as time passes */
+  #flat {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; gap: 26px;
+    overflow-x: auto; overflow-y: hidden;
+    padding: 16px 40px calc(var(--bar-h, 70px) + 16px);
+    --sq: clamp(20px, 5.4vh, 46px);
+  }
+  #flat[hidden] { display: none; }
+  .flat-board { flex: 0 0 auto; }
+  .flat-label { color: var(--dim); font-size: 12px; margin-bottom: 6px; }
+  .flat-board.present .flat-label { color: var(--accent); font-weight: 600; }
+  .flat-grid {
+    display: grid; grid-template-columns: repeat(8, var(--sq));
+    grid-auto-rows: var(--sq); border: 1px solid rgba(255,255,255,0.22);
+  }
+  .flat-board.present .flat-grid { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .flat-board.past { opacity: 0.72; }
+  .flat-board.future .flat-grid { border-style: dashed; }
+  .sq {
+    display: flex; align-items: center; justify-content: center;
+    font-size: calc(var(--sq) * 0.8); line-height: 1; user-select: none;
+    /* text-style symbol fonts only: colour emoji ignore the CSS colours */
+    font-family: "Segoe UI Symbol", "Noto Sans Symbols 2", "DejaVu Sans", sans-serif;
+  }
+  /* piece and square colours are game state, not theme: shield them
+     (!important) from dark-mode extensions that recolour pages */
+  .sq.light { background: #828d9f !important; }
+  .sq.dark { background: #576173 !important; }
+  .sq.wp { color: #f2f0ea !important; text-shadow: 0 1px 2px rgba(0,0,0,0.55); }
+  .sq.bp { color: #191c24 !important; text-shadow: 0 0 2px rgba(255,255,255,0.28); }
+  .sq.faded { opacity: 0.45; } /* departed to the future, or still in transit */
+  .sq.own { cursor: pointer; }
+  .sq.own:hover { box-shadow: inset 0 0 0 999px rgba(232,193,90,0.22); }
+  .sq.sel { box-shadow: inset 0 0 0 3px var(--accent); }
+  .sq.mov { box-shadow: inset 0 0 0 999px rgba(63,174,90,0.45); cursor: pointer; }
+  .sq.cap { box-shadow: inset 0 0 0 999px rgba(208,80,69,0.55); cursor: pointer; }
 
   /* The main bar sits along the bottom so stereo modes get the full width */
   #panel {
@@ -180,6 +221,9 @@
 <body>
 <div id="scene"></div>
 
+<!-- the flat 2D view: one board per turn, left to right (layout "2D") -->
+<div id="flat" hidden></div>
+
 <div id="panel">
   <div id="identity">
     <h1 title="chess, extruded into the time dimension &mdash; 2026 re-implementation of the 2011 original">Time Chess</h1>
@@ -210,7 +254,7 @@
     <button class="mode" data-mode="recent" title="Show the present and the last few turns (key: r)">Recent</button>
     <button class="mode" data-mode="now" title="Show only the present turn (key: n)">Now</button>
     <button class="mode active" data-mode="all" title="Show every turn since the start (key: a)">All</button>
-    <button id="layout" title="Arrange the turns as a vertical stack or a horizontal line, each new board to the right of the last (key: l)">Stack</button>
+    <button id="layout" title="Cycle the layout: 3D stack, 3D line, or flat 2D boards left to right (key: l)">Stack</button>
     <label class="slider" title="Opacity of the board surfaces">Board
       <input type="range" id="boardopacity" min="0" max="100" value="10">
     </label>

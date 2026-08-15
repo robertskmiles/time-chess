@@ -61,7 +61,7 @@ save a king whose history is exposed.
 - **Orbit** drag (one finger) · **zoom** wheel or pinch · **pan**
   right-drag (two fingers)
 - `n`/`r`/`a` show Now / Recent / All turns · `u` undo · `c` AI move ·
-  `l` stack the turns vertically or line them up sideways ·
+  `l` cycle the layout (3D stack, 3D line, flat 2D boards) ·
   `s` cycle stereo (anaglyph, then cross-eye) · `h` this guide
 - You can also type moves into the box on the panel (`/` jumps there):
   chess notation (`e4`, `Nf3`, `exd5`) or plain squares (`e2e4`), with

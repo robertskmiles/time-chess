@@ -25,7 +25,10 @@ const GAP = 1.7; // vertical world distance between turns (stack layout)
 const ROW_GAP = 9.5; // horizontal distance between turns (line layout)
 const RECENT_TURNS = 6;
 
-let layout = 'stack'; // 'stack' (time runs upward) | 'line' (newest on the right)
+// 'stack': 3D, time runs upward. 'line': 3D, each turn to the right of the
+// last. 'flat': 2D boards with chess symbols, left to right as time passes.
+let layout = 'stack';
+const LAYOUTS = ['stack', 'line', 'flat'];
 const layerOrigin = (t) => (layout === 'stack'
   ? new THREE.Vector3(0, t * GAP, 0)
   : new THREE.Vector3(t * ROW_GAP, 0, 0));
@@ -190,6 +193,8 @@ function visibleTurns() {
 }
 
 function rebuild() {
+  if (layout === 'flat') { rebuildFlat(); return; } // the 3D scene is hidden
+
   // tear down previous frame's dynamic content
   for (const child of dynamic.children) {
     if (child.isInstancedMesh) child.dispose();
@@ -317,6 +322,86 @@ function updatePanel() {
       .map((p) => `<span>${humanString(p)} &rarr; ${posToStr(p)}</span>`).join(', ')
     : '';
 }
+
+// ---------------------------------------------------------------------------
+// 2D (flat) view — plain boards with chess symbols, left to right in time.
+// Rebuilt from scratch on every rebuild(), sharing the 3D view's selection
+// state and move logic; only the rendering differs.
+// ---------------------------------------------------------------------------
+
+const flatEl = el('flat');
+// filled glyphs for both sides, coloured in CSS; U+FE0E keeps emoji fonts
+// from rendering them as fixed-colour emoji
+const GLYPHS = { p: '♟︎', r: '♜︎', n: '♞︎', b: '♝︎', q: '♛︎', k: '♚︎' };
+let flatLastT = -1; // auto-scroll to the present board only when the turn changes
+
+function rebuildFlat() {
+  flatEl.innerHTML = '';
+  const turns = [...visibleTurns()].sort((a, b) => a - b);
+  const targets = new Map(); // "x,y,t" -> move, for the selected piece
+  for (const m of legalTargets) targets.set(`${m.to.x},${m.to.y},${m.to.t}`, m);
+  const ghosts = new Map();
+  for (const trav of engine.futureQueue) ghosts.set(`${trav.x},${trav.y},${trav.t}`, trav);
+
+  for (const t of turns) {
+    const board = document.createElement('div');
+    board.className = 'flat-board ' + (t === engine.t ? 'present' : t > engine.t ? 'future' : 'past');
+    const label = document.createElement('div');
+    label.className = 'flat-label';
+    label.textContent = t === engine.t ? `turn ${t} — now` : `turn ${t}`;
+    board.appendChild(label);
+
+    const grid = document.createElement('div');
+    grid.className = 'flat-grid';
+    for (let y = 7; y >= 0; y--) {
+      for (let x = 0; x < 8; x++) {
+        const cell = document.createElement('div');
+        cell.className = 'sq ' + ((x + y) % 2 ? 'light' : 'dark');
+        const key = `${x},${y},${t}`;
+        const p = t <= engine.t ? engine.pieceAt(x, y, t) : null;
+        const ghost = !p && ghosts.get(key);
+        if (p) {
+          cell.textContent = GLYPHS[p.type];
+          cell.classList.add(p.color === 'w' ? 'wp' : 'bp');
+          if (p.sterile) cell.classList.add('faded');
+          cell.title = `${humanString(p)} — ${posToStr(p)}${p.sterile ? ' (departed to the future)' : ''}`;
+        } else if (ghost) {
+          cell.textContent = GLYPHS[ghost.type];
+          cell.classList.add(ghost.color === 'w' ? 'wp' : 'bp', 'faded');
+          cell.title = `${humanString(ghost)} — in transit, due at ${posToStr(ghost)}`;
+        }
+        if (selected && selected.x === x && selected.y === y && selected.t === t) {
+          cell.classList.add('sel');
+        }
+        const mv = targets.get(key);
+        if (mv) {
+          cell.classList.add(engine.pieceAtPos(mv.to) ? 'cap' : 'mov');
+          cell.addEventListener('click', (ev) => { ev.stopPropagation(); tryMove(mv); });
+        } else if (p && !p.sterile && p.t === engine.t && p.color === engine.currentSide
+            && engine.status === 'playing') {
+          cell.classList.add('own');
+          cell.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            if (selected && selected.x === x && selected.y === y && selected.t === t) deselect();
+            else select({ x, y, t });
+          });
+        }
+        grid.appendChild(cell);
+      }
+    }
+    board.appendChild(grid);
+    flatEl.appendChild(board);
+  }
+
+  if (flatLastT !== engine.t) {
+    flatLastT = engine.t;
+    flatEl.querySelector('.flat-board.present')
+      ?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+// clicking empty space (or an inert square) drops the selection
+flatEl.addEventListener('click', () => { if (selected) deselect(); });
 
 // ---------------------------------------------------------------------------
 // Interaction
@@ -618,17 +703,21 @@ try {
 } catch { /* no storage */ }
 applyBoardOpacity();
 
-// layout toggle: stack the turns vertically, or lay them out in a row with
-// each new board appearing to the right of the last (persisted across visits)
+// layout toggle, cycling stack -> line -> flat 2D (persisted across visits)
 function setLayout(mode) {
   layout = mode;
-  el('layout').textContent = mode === 'stack' ? 'Stack' : 'Line';
+  el('layout').textContent = mode === 'stack' ? 'Stack' : mode === 'line' ? 'Line' : '2D';
+  flatEl.hidden = mode !== 'flat';
+  if (mode === 'flat') flatLastT = -1; // re-centre on the present board
   rebuild();
   try { localStorage.setItem('timechess-layout', mode); } catch { /* private mode */ }
 }
-el('layout').addEventListener('click', () => setLayout(layout === 'stack' ? 'line' : 'stack'));
+el('layout').addEventListener('click', () => {
+  setLayout(LAYOUTS[(LAYOUTS.indexOf(layout) + 1) % LAYOUTS.length]);
+});
 try {
-  if (localStorage.getItem('timechess-layout') === 'line') setLayout('line');
+  const saved = localStorage.getItem('timechess-layout');
+  if (LAYOUTS.includes(saved) && saved !== 'stack') setLayout(saved);
 } catch { /* no storage */ }
 
 const STEREO_MODES = ['off', 'anaglyph', 'cross'];
@@ -800,6 +889,7 @@ let followY = 0.4;
 
 function animate() {
   requestAnimationFrame(animate);
+  if (layout === 'flat') return; // the 2D overlay covers the whole scene
   const wantY = (layout === 'stack' ? engine.t * GAP : 0) + 0.4;
   const wantX = layout === 'line' ? engine.t * ROW_GAP : 0;
   if (Math.abs(wantY - followY) > 0.001) {

@@ -49,7 +49,7 @@ entirely in the visitor's browser, in a Web Worker.
 | type in the move box (key: `/`) | make a move by notation: algebraic (`e4`, `Nf3`, `exd5`, `Nbd2`), coordinate (`e2e4`), or full TCECP (`a2t0a4t0`); add `tN` to the destination for time travel (`Nf3t2`, or `Nf3t+2` relative to now) |
 | `n` / `r` / `a` | show Now only / Recent turns / All turns |
 | `s` | cycle stereo 3D: red/blue anaglyph (as in the original), then cross-eye side-by-side, then off |
-| `l` | toggle the layout: a vertical stack of turns, or a horizontal line with each new board to the right of the last |
+| `l` | cycle the layout: a vertical 3D stack of turns; a horizontal 3D line with each new board to the right of the last; or a flat 2D view with ordinary chess symbols, boards left to right as time progresses |
 | `u` | undo (against the AI it takes back its reply and your move together) |
 | `c` | AI move: the built-in AI plays one move for the side to move |
 | `h` | the how-to-play guide (also opens automatically on first visit) |
