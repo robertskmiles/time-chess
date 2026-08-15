@@ -21,10 +21,15 @@ import { AI } from './ai.js';
 // Constants and scene basics
 // ---------------------------------------------------------------------------
 
-const GAP = 1.7; // vertical world distance between turns
+const GAP = 1.7; // vertical world distance between turns (stack layout)
+const ROW_GAP = 9.5; // horizontal distance between turns (line layout)
 const RECENT_TURNS = 6;
 
-const worldPos = (x, y, t) => new THREE.Vector3(x, t * GAP, 7 - y);
+let layout = 'stack'; // 'stack' (time runs upward) | 'line' (newest on the right)
+const layerOrigin = (t) => (layout === 'stack'
+  ? new THREE.Vector3(0, t * GAP, 0)
+  : new THREE.Vector3(t * ROW_GAP, 0, 0));
+const worldPos = (x, y, t) => layerOrigin(t).add(new THREE.Vector3(x, 0, 7 - y));
 
 const container = document.getElementById('scene');
 // the scene box is not the whole window on phones (the panel becomes a
@@ -198,13 +203,14 @@ function rebuild() {
   for (const t of turns) {
     const mat = t === engine.t ? gridNowMat : (t > engine.t ? gridFutureMat : gridPastMat);
     const grid = new THREE.LineSegments(gridGeometry, mat);
-    grid.position.y = t * GAP;
+    grid.position.copy(layerOrigin(t));
     grid.renderOrder = layerOrder(t, ON_SURFACE);
     dynamic.add(grid);
 
     if (t <= engine.t) { // future layers hold no pieces; the grid is enough
       const surface = new THREE.Mesh(surfaceGeometry, surfaceMat);
-      surface.position.set(3.5, t * GAP - 0.02, 3.5);
+      surface.position.copy(worldPos(3.5, 3.5, t));
+      surface.position.y -= 0.02;
       surface.renderOrder = layerOrder(t, 0);
       dynamic.add(surface);
     }
@@ -228,7 +234,8 @@ function rebuild() {
     const mesh = new THREE.InstancedMesh(
       pieceGeometry[type], color === 'w' ? whiteMat : blackMat, pieces.length);
     pieces.forEach((p, i) => {
-      m4.makeTranslation(p.x, p.t * GAP, 7 - p.y);
+      const v = worldPos(p.x, p.y, p.t);
+      m4.makeTranslation(v.x, v.y, v.z);
       if (color === 'b') m4.multiply(flip); // knights face their own forward
       mesh.setMatrixAt(i, m4);
     });
@@ -611,6 +618,19 @@ try {
 } catch { /* no storage */ }
 applyBoardOpacity();
 
+// layout toggle: stack the turns vertically, or lay them out in a row with
+// each new board appearing to the right of the last (persisted across visits)
+function setLayout(mode) {
+  layout = mode;
+  el('layout').textContent = mode === 'stack' ? 'Stack' : 'Line';
+  rebuild();
+  try { localStorage.setItem('timechess-layout', mode); } catch { /* private mode */ }
+}
+el('layout').addEventListener('click', () => setLayout(layout === 'stack' ? 'line' : 'stack'));
+try {
+  if (localStorage.getItem('timechess-layout') === 'line') setLayout('line');
+} catch { /* no storage */ }
+
 const STEREO_MODES = ['off', 'anaglyph', 'cross'];
 function setStereo(mode) {
   stereoMode = mode;
@@ -756,6 +776,7 @@ window.addEventListener('keydown', (ev) => {
   else if (k === 'r') setMode('recent');
   else if (k === 'a') setMode('all');
   else if (k === 's') cycleStereo();
+  else if (k === 'l') el('layout').click();
   else if (k === 'u') el('undo').click();
   else if (k === 'c') aiMove();
   else if (k === 'escape' && selected) deselect();
@@ -771,18 +792,27 @@ window.addEventListener('resize', () => {
 
 // ---------------------------------------------------------------------------
 // Render loop — the camera drifts to follow the present layer as it climbs
+// the stack (or marches rightward along the line)
 // ---------------------------------------------------------------------------
 
+let followX = 0;
 let followY = 0.4;
 
 function animate() {
   requestAnimationFrame(animate);
-  const wantY = engine.t * GAP + 0.4;
+  const wantY = (layout === 'stack' ? engine.t * GAP : 0) + 0.4;
+  const wantX = layout === 'line' ? engine.t * ROW_GAP : 0;
   if (Math.abs(wantY - followY) > 0.001) {
     const dy = (wantY - followY) * 0.06;
     followY += dy;
     controls.target.y += dy;
     camera.position.y += dy;
+  }
+  if (Math.abs(wantX - followX) > 0.001) {
+    const dx = (wantX - followX) * 0.06;
+    followX += dx;
+    controls.target.x += dx;
+    camera.position.x += dx;
   }
   controls.update();
   // both stereo effects converge the eyes at camera.focus; put that on the
